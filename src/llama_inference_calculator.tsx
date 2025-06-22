@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Calculator, Cpu, HardDrive, DollarSign, Clock, Info } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Calculator, Info } from 'lucide-react';
 
 interface InferenceConfig {
   modelSize: number;
@@ -93,7 +93,6 @@ const LlamaInferenceCalculator = () => {
     // Compute requirements (FLOPs)
     const flopsPerToken = 2 * modelParams * 1e9; // 2N FLOPs per token
     const promptFlops = flopsPerToken * promptTokens;
-    const completionFlops = flopsPerToken * completionTokens;
     
     // Throughput calculations
     const totalComputeThroughput = gpu.computeThroughputEffective * numGpus * 1e12; // Convert to FLOPS
