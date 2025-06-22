@@ -1,8 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { Calculator, Cpu, HardDrive, DollarSign, Clock, Info } from 'lucide-react';
 
+interface InferenceConfig {
+  modelSize: number;
+  sequenceLength: number;
+  batchSize: number;
+  numGpus: number;
+  gpuType: 'A100-80GB' | 'H100-80GB';
+  precision: number;
+  gpuCostPerHour: number;
+  promptTokens: number;
+  completionTokens: number;
+}
+
+interface Gpt35Comparison {
+  promptSavings: string;
+  completionSavings: string;
+}
+
+interface InferenceResults {
+  modelWeightsGB: string;
+  kvCacheTotalGB: string;
+  totalMemoryGB: string;
+  memoryUtilization: string;
+  promptProcessingTime: string;
+  completionTime: string;
+  promptTokensPerSecond: string;
+  generationTokensPerSecond: string;
+  totalTime: string;
+  totalCost: string;
+  promptCostPer1k: string;
+  completionCostPer1k: string;
+  maxBatchSize: number;
+  optimalBatchSize: number;
+  gpt35Comparison: Gpt35Comparison;
+}
+
 const LlamaInferenceCalculator = () => {
-  const [config, setConfig] = useState({
+  const [config, setConfig] = useState<InferenceConfig>({
     modelSize: 70, // billion parameters
     sequenceLength: 2048,
     batchSize: 1,
@@ -14,7 +49,7 @@ const LlamaInferenceCalculator = () => {
     completionTokens: 500
   });
 
-  const [results, setResults] = useState({});
+  const [results, setResults] = useState<InferenceResults | null>(null);
 
   // GPU specifications
   const gpuSpecs = {
@@ -112,10 +147,10 @@ const LlamaInferenceCalculator = () => {
     });
   };
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: keyof InferenceConfig, value: string) => {
     setConfig(prev => ({
       ...prev,
-      [field]: parseFloat(value) || value
+      [field]: field === 'gpuType' ? value as 'A100-80GB' | 'H100-80GB' : (parseFloat(value) || 0)
     }));
   };
 
@@ -254,126 +289,92 @@ const LlamaInferenceCalculator = () => {
           <div className="space-y-6">
             <h2 className="text-xl font-semibold text-gray-700 border-b pb-2">Results</h2>
             
-            {/* Memory Usage */}
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <HardDrive className="text-blue-600" size={20} />
-                <h3 className="font-semibold text-blue-800">Memory Usage</h3>
+            {!results ? (
+              <div className="flex items-center justify-center h-full pt-16">
+                <p className="text-gray-500">Calculating...</p>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Model Weights:</span>
-                  <span className="font-semibold ml-2">{results.modelWeightsGB} GB</span>
+            ) : (
+              <div className="space-y-4">
+                {/* Throughput */}
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <h3 className="font-semibold text-blue-800 mb-2">Throughput</h3>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div>
+                      <span className="text-2xl font-bold text-blue-600">{results.generationTokensPerSecond}</span>
+                      <p className="text-xs text-blue-700">Tokens/sec (Gen)</p>
+                    </div>
+                    <div>
+                      <span className="text-2xl font-bold text-blue-600">{results.promptTokensPerSecond}</span>
+                      <p className="text-xs text-blue-700">Tokens/sec (Prompt)</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-600">KV Cache:</span>
-                  <span className="font-semibold ml-2">{results.kvCacheTotalGB} GB</span>
+
+                {/* Latency */}
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <h3 className="font-semibold text-green-800 mb-2">Latency</h3>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-500">Prompt: {results.promptProcessingTime} ms</p>
+                    <p className="text-sm text-gray-500">Completion: {results.completionTime} s</p>
+                    <p className="text-sm font-semibold text-gray-700 mt-1">Total: {results.totalTime} s</p>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-600">Total Memory:</span>
-                  <span className="font-semibold ml-2">{results.totalMemoryGB} GB</span>
+
+                {/* Cost */}
+                <div className="p-4 bg-yellow-50 rounded-lg">
+                  <h3 className="font-semibold text-yellow-800 mb-2">Cost Analysis</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="text-center">
+                      <span className="text-lg font-bold text-yellow-700">${results.promptCostPer1k}</span>
+                      <p className="text-xs text-yellow-600">/ 1k Prompt</p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-lg font-bold text-yellow-700">${results.completionCostPer1k}</span>
+                      <p className="text-xs text-yellow-600">/ 1k Completion</p>
+                    </div>
+                  </div>
+                  <div className="text-center mt-2">
+                    <span className="text-2xl font-bold text-yellow-800">{results.totalCost}¢</span>
+                    <p className="text-xs text-yellow-700">Total Request Cost</p>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-600">Memory Usage:</span>
-                  <span className={`font-semibold ml-2 ${parseFloat(results.memoryUtilization) > 90 ? 'text-red-600' : 'text-green-600'}`}>
-                    {results.memoryUtilization}%
-                  </span>
+                
+                {/* Hardware */}
+                <div className="p-4 bg-indigo-50 rounded-lg">
+                  <h3 className="font-semibold text-indigo-800 mb-2">Hardware Utilization</h3>
+                  <p className="text-sm text-gray-600">Max Batch Size: <span className="font-semibold">{results.maxBatchSize}</span></p>
+                  <p className="text-sm text-gray-600">Total Memory: {results.totalMemoryGB} GB</p>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                    <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${results.memoryUtilization}%` }}></div>
+                  </div>
+                  <p className="text-xs text-right text-indigo-700">{results.memoryUtilization}% Memory Util.</p>
                 </div>
-              </div>
-            </div>
-            
-            {/* Performance */}
-            <div className="bg-green-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <Cpu className="text-green-600" size={20} />
-                <h3 className="font-semibold text-green-800">Performance</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Prompt Speed:</span>
-                  <span className="font-semibold ml-2">{results.promptTokensPerSecond} tok/s</span>
+                
+                {/* Comparison */}
+                <div className="p-4 border-t border-gray-200">
+                  <h3 className="font-semibold text-gray-700 mb-2">vs. GPT-3.5-Turbo</h3>
+                  <div className="flex justify-around items-center text-center">
+                    <div>
+                      <p className={`text-xl font-bold ${parseFloat(results.gpt35Comparison.promptSavings) > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {results.gpt35Comparison.promptSavings}%
+                      </p>
+                      <p className="text-xs text-gray-500">Prompt Savings</p>
+                    </div>
+                    <div>
+                      <p className={`text-xl font-bold ${parseFloat(results.gpt35Comparison.completionSavings) > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {results.gpt35Comparison.completionSavings}%
+                      </p>
+                      <p className="text-xs text-gray-500">Completion Savings</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-600">Generation Speed:</span>
-                  <span className="font-semibold ml-2">{results.generationTokensPerSecond} tok/s</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Time to First Token:</span>
-                  <span className="font-semibold ml-2">{results.promptProcessingTime} ms</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Total Time:</span>
-                  <span className="font-semibold ml-2">{results.totalTime} s</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* Cost Analysis */}
-            <div className="bg-yellow-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <DollarSign className="text-yellow-600" size={20} />
-                <h3 className="font-semibold text-yellow-800">Cost Analysis</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Prompt Cost:</span>
-                  <span className="font-semibold ml-2">${results.promptCostPer1k}/1k tok</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Completion Cost:</span>
-                  <span className="font-semibold ml-2">${results.completionCostPer1k}/1k tok</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Total Request Cost:</span>
-                  <span className="font-semibold ml-2">{results.totalCost}¢</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Max Batch Size:</span>
-                  <span className="font-semibold ml-2">{results.maxBatchSize}</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* GPT-3.5 Comparison */}
-            <div className="bg-purple-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <Info className="text-purple-600" size={20} />
-                <h3 className="font-semibold text-purple-800">vs GPT-3.5 Turbo</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Prompt Savings:</span>
-                  <span className={`font-semibold ml-2 ${parseFloat(results.gpt35Comparison?.promptSavings) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {results.gpt35Comparison?.promptSavings}%
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Completion Savings:</span>
-                  <span className={`font-semibold ml-2 ${parseFloat(results.gpt35Comparison?.completionSavings) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {results.gpt35Comparison?.completionSavings}%
-                  </span>
+
+                <div className="text-xs text-gray-500 pt-2 text-center flex items-center justify-center gap-2">
+                  <Info size={14} />
+                  <span>Optimal batch size for latency is <span className="font-bold">{results.optimalBatchSize}</span>. Higher batch sizes increase throughput but also latency.</span>
                 </div>
               </div>
-            </div>
-            
-            {/* Recommendations */}
-            <div className="bg-indigo-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-indigo-800 mb-2">Recommendations</h3>
-              <div className="text-sm text-gray-700 space-y-1">
-                {parseFloat(results.gpt35Comparison?.promptSavings) > 0 && (
-                  <div className="text-green-700">✓ Great for prompt-heavy tasks (classification, reranking)</div>
-                )}
-                {parseFloat(results.gpt35Comparison?.completionSavings) < 0 && (
-                  <div className="text-red-700">⚠ More expensive than GPT-3.5 for completions</div>
-                )}
-                {parseFloat(results.memoryUtilization) > 90 && (
-                  <div className="text-orange-700">⚠ High memory usage - consider more GPUs</div>
-                )}
-                {config.batchSize < results.optimalBatchSize && (
-                  <div className="text-blue-700">💡 Increase batch size to {results.optimalBatchSize} for better efficiency</div>
-                )}
-              </div>
-            </div>
+            )}
           </div>
         </div>
         
